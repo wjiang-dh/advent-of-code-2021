@@ -1,126 +1,118 @@
-fun main() {
+import java.lang.Exception
 
-    fun calculateScore(board: List<List<String>>, draws: List<String>, step: Int): Int {
+class Board(private val rows: List<List<String>>, private val draws: List<String>){
+
+    private val columns = transpose(rows)
+    val bingoIndex = findBingoIndex() ?: Int.MAX_VALUE
+    val bingoNumber = draws[bingoIndex].toInt()
+    val bingoScore = calculateScore()
+
+    private fun findBingoIndex(): Int? {
+        val indexesOfAllLines: MutableList<Int> = mutableListOf()
+        for (line in rows + columns){
+            var largestIndexInLine = -1
+            for (number in line){
+                // there is a number that can never be drawn, so this row/column can never bingo
+                if (!draws.contains(number)){
+                    largestIndexInLine = Int.MAX_VALUE
+                    break
+                }
+                if (draws.indexOf(number) > largestIndexInLine){
+                    largestIndexInLine = draws.indexOf(number)
+                }
+            }
+            indexesOfAllLines.add(largestIndexInLine)
+        }
+        return indexesOfAllLines.minOrNull()
+    }
+
+    private fun calculateScore(): Int {
         var score = 0
-        for (row in board){
+        for (row in rows){
             for (number in row){
-                if (!draws.contains(number) || draws.indexOf(number) > step){
+                if (!draws.contains(number) || draws.indexOf(number) > bingoIndex){
                     score += number.toInt()
                 }
             }
         }
         return score
     }
+}
 
-    fun calculateSteps(boards: List<List<String>>, draws: List<String>): List<Int> {
-        val steps: MutableList<Int> = mutableListOf()
-        for (i in boards.indices){
-            var largest = -1
-            for (number in boards[i]){
-                if (draws.indexOf(number) > largest){
-                    largest = draws.indexOf(number)
-                }
-            }
-            steps.add(largest)
+fun processInput(input: List<String>): List<Board>{
+    val draws = input[0].split(",")
+
+    val data: MutableList<List<String>> = mutableListOf()
+    val boards: MutableList<Board> = mutableListOf()
+
+    // process readings and construct boards
+    for (index in 2 until input.size){
+        if (input[index].isNotEmpty()) {
+            val pattern = """\W+""".toRegex()
+            val line = pattern.split(input[index]).filter { it.isNotBlank() }
+            data.add(line)
+        } else {
+            boards.add(Board(data, draws))
+            data.removeAll(data)
         }
-        return steps
     }
+    // add the last board
+    boards.add(Board(data, draws))
+
+    return boards
+}
+
+fun transpose(table: List<List<String>>): List<List<String>> {
+    val ret: MutableList<List<String>> = ArrayList()
+    for (i in 0 until table[0].size) {
+        val col: MutableList<String> = ArrayList()
+        for (row in table) {
+            col.add(row[i])
+        }
+        ret.add(col)
+    }
+    return ret
+}
+
+fun main() {
 
     fun part1(input: List<String>): Int {
-        val draws = input[0].split(",")
 
-        val rows : MutableList<List<String>> = mutableListOf()
-        val columns : MutableList<List<String>> = mutableListOf()
+        val boards = processInput(input)
 
-        for (index in 1 until input.size){
-            if (input[index].isNotEmpty()) {
-                val pattern = """\W+""".toRegex()
-                val row = pattern.split(input[index]).filter { it.isNotBlank() }
-                rows.add(row)
+        // find the board that first bingo
+        var smallestBingoIndexes = Int.MAX_VALUE
+        var winnerBoard: Board? = null
+        for (board in boards){
+            if (board.bingoIndex < smallestBingoIndexes){
+                smallestBingoIndexes = board.bingoIndex
+                winnerBoard = board
             }
         }
-
-        for (index in 0 until rows.size step 5){
-            val transpose = Array(5) { Array(5) {""} }
-            for (i in 0..4) {
-                for (j in 0..4) {
-                    transpose[j][i] = rows[index+i][j]
-                }
-            }
-            for (array in transpose){
-                columns.add(array.toList())
-            }
+        if (winnerBoard == null){
+            throw Exception("There is no winner!")
         }
-
-        val total = rows + columns
-        val steps = calculateSteps(total, draws)
-        val smallestStep = steps.minOrNull()
-
-        var score = 0
-        var lastStep = 0
-        if (smallestStep != null){
-            val index = steps.indexOf(smallestStep)
-            val boardStartLine = (index).floorDiv(5)*5
-            val board = total.slice(boardStartLine..boardStartLine+4)
-            score = calculateScore(board, draws, smallestStep)
-
-            lastStep = draws[smallestStep].toInt()
-        }
-
-        return score*lastStep
+        return winnerBoard.bingoScore * winnerBoard.bingoNumber
     }
 
 
     fun part2(input: List<String>): Int {
 
-        val draws = input[0].split(",")
+        val boards = processInput(input)
 
-        val rows : MutableList<List<String>> = mutableListOf()
-        val columns : MutableList<List<String>> = mutableListOf()
-
-        for (index in 1 until input.size){
-            if (input[index].isNotEmpty()) {
-                val pattern = """\W+""".toRegex()
-                val row = pattern.split(input[index]).filter { it.isNotBlank() }
-                rows.add(row)
+        // find the board that last bingo
+        var largestBingoIndexes = Int.MIN_VALUE
+        var loserBoard: Board? = null
+        for (board in boards){
+            if (board.bingoIndex > largestBingoIndexes){
+                largestBingoIndexes = board.bingoIndex
+                loserBoard = board
             }
         }
-
-        for (index in 0 until rows.size step 5){
-            val transpose = Array(5) { Array(5) {""} }
-            for (i in 0..4) {
-                for (j in 0..4) {
-                    transpose[j][i] = rows[index+i][j]
-                }
-            }
-            for (array in transpose){
-                columns.add(array.toList())
-            }
+        if (loserBoard == null){
+            throw Exception("There is no loser!")
         }
-
-        val rowSteps = calculateSteps(rows, draws)
-        val columnSteps = calculateSteps(columns, draws)
-
-        val stepsToBingo : MutableList<Int> = mutableListOf()
-
-        for (index in rowSteps.indices step 5){
-            val boardStep =
-                rowSteps.slice(index..index+4).minOrNull()
-                    ?.let { columnSteps.slice(index..index+4).minOrNull()?.let { it1 -> minOf(it, it1) } }
-            if (boardStep != null) {
-                stepsToBingo.add(boardStep)
-            }
-        }
-
-        val maxStepsToBingo = stepsToBingo.maxOrNull()
-        val maxBoardIndex = stepsToBingo.indexOf(maxStepsToBingo)
-
-        val boardStartLine = maxBoardIndex*5
-        val board = rows.slice(boardStartLine..boardStartLine+4)
-        val score = calculateScore(board, draws, maxStepsToBingo!!)
-        val lastStep = draws[maxStepsToBingo].toInt()
-
-        return score*lastStep
+        return loserBoard.bingoScore * loserBoard.bingoNumber
     }
 
     // test if implementation meets criteria from the description, like:
